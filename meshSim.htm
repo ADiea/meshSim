@@ -1,0 +1,34 @@
+<!DOCTYPE html PUBLIC"-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+
+<head>
+<meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<meta content="utf-8" http-equiv="encoding">
+<script type="text/javascript" src="gfx.js"></script>
+<script type="text/javascript" src="mesh.js"></script>
+<script type="text/javascript" src="sim.js"></script>
+<script type="text/javascript">
+function simInit()
+{
+	var mesh = new Mesh();
+	var gfx = new Gfx();
+	var sim = new Sim();
+	
+	var meshSettings = {};
+	
+	mesh.init(meshSettings);
+	gfx.init(document.getElementById("simCanvas"));
+	sim.init(gfx, mesh);
+}
+</script>
+
+
+</head>
+
+<body onload="simInit()">
+ <canvas id="simCanvas" width="800" height="600" style="border:1px solid #000000;">
+	Canvas is not supported in your browser.
+ </canvas>
+</body>
+
+</html>
