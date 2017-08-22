@@ -6,12 +6,13 @@
 <meta content="utf-8" http-equiv="encoding">
 <script type="text/javascript" src="gfx.js"></script>
 <script type="text/javascript" src="mesh.js"></script>
+<script type="text/javascript" src="node.js"></script>
 <script type="text/javascript" src="sim.js"></script>
 <script type="text/javascript">
 function simInit()
 {
-	var meshSettings = {nodeRadius:30};
-	var gfxSettings = {gridSize:15, crosshairOffset:15};
+	var meshSettings = {};
+	var gfxSettings = {gridSize:20, gridScale:1.0/4};
 	
 	mesh.init(meshSettings);
 	gfx.init(document.getElementById("simCanvas"), gfxSettings, sim);
@@ -23,9 +24,28 @@ function simInit()
 </head>
 
 <body onload="simInit()">
- <canvas id="simCanvas" width="800" height="600" style="border:1px solid #000000;">
-	Canvas is not supported in your browser.
- </canvas>
-</body>
+<table>
+	<tr>
+		<td>
+			<input type="radio" id="addNode" name="nodeOp" value="addNode">AddNode</input>
+			<input type="radio" id="delNode" name="nodeOp" value="delNode">DelNode</input>
 
+			<input type="range" id="nodeRadius" name="nodeRadius" min=10 max=100></input><span id="textNodeRadius"></span>
+		</td>
+	</tr>
+	<tr>
+		<td>
+			<input type="checkbox" id="showGuides" name="showGuides" checked="true">ShowGuides</input>
+		</td>
+	</tr>
+	<tr>
+		<td>
+		 <canvas id="simCanvas" width="800" height="600" style="border:1px solid #000000;">
+			Canvas is not supported in your browser.
+		 </canvas>
+		</td> 
+	</tr> 
+</table>
+
+</body>
 </html>
