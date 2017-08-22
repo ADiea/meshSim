@@ -10,14 +10,11 @@
 <script type="text/javascript">
 function simInit()
 {
-	var mesh = new Mesh();
-	var gfx = new Gfx();
-	var sim = new Sim();
-	
-	var meshSettings = {};
+	var meshSettings = {nodeRadius:30};
+	var gfxSettings = {gridSize:15, crosshairOffset:15};
 	
 	mesh.init(meshSettings);
-	gfx.init(document.getElementById("simCanvas"));
+	gfx.init(document.getElementById("simCanvas"), gfxSettings, sim);
 	sim.init(gfx, mesh);
 }
 </script>
