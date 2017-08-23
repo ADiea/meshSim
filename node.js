@@ -11,22 +11,35 @@ function Node(x, y, r)
 	this.neigh = [];
 }
 
-Node.prototype.boot = function(nodes)
+Node.prototype.boot = function(mesh)
 {
-	this.searchNeigh(nodes);	
+	this.mesh = mesh;
+	this.searchNeigh();
 }
 
 Node.prototype.shutdown = function()
 {
-	for(var i in this.neigh)
-	{
-		this.neigh[i].processMessage({from:this, data:"bye"});
-	}	
+	this.sendMsg({from:this, to:null, type:"bye"});
+}
+
+Node.prototype.sendMsg = function(msg)
+{
+	this.mesh.sendMsg(msg);
+}
+
+Node.prototype.onRecvMsg = function(msg)
+{
+	this.processMessage(msg);
+}
+
+Node.prototype.onTimer = function()
+{
+	this.searchNeigh();
 }
 
 Node.prototype.processMessage = function(msg)
 {
-	if(msg.data == "bye")
+	if(msg.type == "bye")
 	{
 		var index = this.neigh.indexOf(msg.from);
 		if(index > -1)
@@ -34,26 +47,22 @@ Node.prototype.processMessage = function(msg)
 			this.neigh.splice(index,1);
 		}
 	}
-}
-
-Node.prototype.searchNeigh = function(nodes)
-{
-	this.neigh = [];
-	for(var i in nodes)
+	if(msg.type == "discovery")
 	{
-		if(this == nodes[i])
-			continue;
-		if(this.sqrDist(this.x, this.y, 
-						nodes[i].x, nodes[i].y) < 
-		   this.r + nodes[i].r)
+		if(msg.action == "reply")
 		{
-			this.neigh.push(nodes[i]);
+			this.neigh.push(msg.from);
+		}
+		else if(msg.action == "hello")
+		{
+			this.sendMsg({from:this, to:msg.from, type:"discovery", action:"reply"});
 		}
 	}
 }
 
-Node.prototype.sqrDist = function (x1, y1, x2, y2) 
+Node.prototype.searchNeigh = function()
 {
-	var a = x1 - x2, b = y1 - y2;
-	return Math.sqrt( a*a + b*b );
+	this.neigh = [];
+	this.sendMsg({from:this, to:null, type:"discovery", action:"hello"});
 }
+
