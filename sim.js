@@ -23,7 +23,7 @@ Sim.prototype.init = function(gfx, mesh)
 
 	this.settings = {nodeHandle:10, nodeRadius:30};
 	this.flags = {nodeMoving:-1};	
-	this.ui = {showGuides:false, addNode:true, delNode:false};
+	this.ui = {showGuides:false, addNode:true, delNode:false, frameTimeout:null};
 	
 	this.dom.showGuides.checked = this.ui.showGuides;
 	this.dom.showGuides.onchange = function() {sim.ui.showGuides = sim.dom.showGuides.checked;}
@@ -84,16 +84,22 @@ Sim.prototype.drawNodeLinks = function ()
 	}
 }
 
+Sim.prototype.drawFrame = function ()
+{
+	clearTimeout(sim.ui.frameTimeout);
+	sim.ui.frameTimeout = setTimeout(sim.drawFrame, 300);
+	
+	sim.gfx.drawBkg();
+	sim.drawNodes();
+	sim.drawNodeLinks();
+} 
+
 //Mouse events
 
 Sim.prototype.mousemove = function (pt) 
 {
 	var idxNodeFound = this.findNode(pt);	
-
-	this.gfx.drawBkg();
-	this.drawNodes();
-	this.drawNodeLinks();
-	
+	this.drawFrame(); //first draw frame
 	if(this.ui.addNode)
 	{
 		if(this.flags.nodeMoving != -1)
@@ -143,8 +149,7 @@ Sim.prototype.mousedown = function (pt)
 			this.mesh.addNode(node);
 		}
 			
-		this.gfx.drawBkg();
-		this.drawNodes();
+		this.drawFrame();
 	}
 }
 
@@ -166,8 +171,7 @@ Sim.prototype.mouseup = function (pt)
 			this.mesh.delNode(idxNodeFound);
 		}
 	}
-	this.gfx.drawBkg();
-	this.drawNodes();
+	this.drawFrame();
 }
 
 //Utility functions
