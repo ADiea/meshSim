@@ -103,10 +103,15 @@ Gfx.prototype.drawGuides = function(pt)
 Gfx.prototype.drawLine = function(line)
 {
    this.ctx.strokeStyle = line.c;
+   if(line.dash)
+   {
+	   this.ctx.setLineDash(line.dash);
+   }
    this.ctx.beginPath();
    this.ctx.moveTo(line.x1, line.y1);
    this.ctx.lineTo(line.x2, line.y2);
    this.ctx.stroke();
+   this.ctx.setLineDash([]);
 }
 
 Gfx.prototype.winToCanvas = function(x, y) 

@@ -7,19 +7,20 @@ var mesh = new Mesh();
 function Mesh()
 {
 	this.nodes = [];
+	this.uniqueId = 1;
 }
 
 Mesh.prototype.init = function(settings)
 {
 	this.settings = settings;
-	setTimeout(mesh.onTimer, 3000);
 }
 
 Mesh.prototype.addNode = function(node)
 {
+	node.mac = this.uniqueId++;
 	this.nodes.push(node);
 	//boot-up the node
-	node.boot(this);
+	node.powerUp(this);
 }
 
 Mesh.prototype.updateNodePosition = function(i, pt)
@@ -30,7 +31,6 @@ Mesh.prototype.updateNodePosition = function(i, pt)
 
 Mesh.prototype.delNode = function(i)
 {
-	this.nodes[i].shutdown();
 	this.nodes.splice(i,1);
 }
 
@@ -40,25 +40,20 @@ Mesh.prototype.sqrDist = function (x1, y1, x2, y2)
 	return Math.sqrt( a*a + b*b );
 }
 
-Mesh.prototype.onTimer = function()
-{
-	for(var i in mesh.nodes)
-	{
-		mesh.nodes[i].onTimer();
-	}
-	setTimeout(mesh.onTimer, 3000);
-}
-
 Mesh.prototype.sendMsg = function(msg)
 {
+	//some packets are lost due to errors
+	if(Math.floor(100 * Math.random()) < this.settings.errorRate)
+		return;
+	
 	if(msg.to)
 	{
 		if(this.sqrDist(msg.from.x, msg.from.y, 
 						msg.to.x, msg.to.y) < 
-		   msg.from.r + msg.to.r)
+						msg.from.r + msg.to.r)
 		{
 			msg.to.onRecvMsg(msg);
-		}		
+		}
 	}
 	else //broadcast
 	{

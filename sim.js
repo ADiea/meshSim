@@ -19,14 +19,23 @@ Sim.prototype.init = function(gfx, mesh)
 		nodeRadius : document.getElementById("nodeRadius"),
 		showGuides : document.getElementById("showGuides"),
 		textNodeRadius : document.getElementById("textNodeRadius"),
+		showNeigh : document.getElementById("showNeigh"),
+		showRoutes : document.getElementById("showRoutes"),
+		textNodesDescr : document.getElementById("textNodesDescr"),
 	};
 
-	this.settings = {nodeHandle:10, nodeRadius:30};
+	this.settings = {nodeHandle:15, nodeRadius:80};
 	this.flags = {nodeMoving:-1};	
-	this.ui = {showGuides:false, addNode:true, delNode:false, frameTimeout:null};
+	this.ui = {showGuides:false, addNode:true, delNode:false, frameTimeout:null, showNeigh:true, showRoutes:true};
 	
 	this.dom.showGuides.checked = this.ui.showGuides;
 	this.dom.showGuides.onchange = function() {sim.ui.showGuides = sim.dom.showGuides.checked;}
+
+	this.dom.showNeigh.checked = this.ui.showNeigh;
+	this.dom.showNeigh.onchange = function() {sim.ui.showNeigh = sim.dom.showNeigh.checked;}
+
+	this.dom.showRoutes.checked = this.ui.showRoutes;
+	this.dom.showRoutes.onchange = function() {sim.ui.showRoutes = sim.dom.showRoutes.checked;}
 	
 	this.dom.addNode.checked = this.ui.addNode;
 	this.dom.addNode.onchange = function() 
@@ -56,42 +65,111 @@ Sim.prototype.drawNodes = function ()
 	for(i in this.mesh.nodes)
 	{
 		var node = this.mesh.nodes[i];
-		
-		this.gfx.drawText({f:"12px Arial", t:i, x:node.x - 4, y:node.y + 4, c:"red"});
 		this.gfx.drawCircle({x:node.x, y:node.y, r:this.settings.nodeHandle, c:"grey"});
-		this.gfx.drawCircle({x:node.x, y:node.y, r:node.r, c:"black"});
+
+		var text = this.mesh.nodes[i].mac;
+		
+		this.gfx.drawText({f:"14px Arial", 
+						   t:text, 
+						   x:node.x - gfx.measureText({t:text, f:"14px Arial"}).width/2, 
+						   y:node.y + 6, 
+						   c:"red"});
+		
+		this.gfx.drawCircle({x:node.x, y:node.y, r:node.r, c:node.isAwake?"blue":"black"});
 	}
+}
+
+Sim.prototype.drawNodeDescr = function()
+{
+	var descr = "<table border=\"1\">";
+	
+	descr += "<tr> <td>MAC</td> <td>Neigh</td> <td>Time</td> <td>RTC_Alarm</td> <td>#Alarms</td> </tr>";
+	
+	for(i in this.mesh.nodes)
+	{
+		var node = this.mesh.nodes[i];
+		descr += "<tr>";
+		
+		descr += "<td>[";
+		descr += this.mesh.nodes[i].mac;
+		descr += "]</td>";
+		
+		descr += "<td>";
+		descr += this.mesh.nodes[i].neigh.length + ": ";
+		for(j in this.mesh.nodes[i].neigh)
+		{
+			descr += this.mesh.nodes[i].neigh[j].mac + " ";
+		}
+		descr += "</td>";
+
+		descr += "<td>";
+		descr += this.mesh.nodes[i].rtcTimestamp;
+		descr += "</td>";
+
+		descr += "<td>";
+		descr += this.mesh.nodes[i].rtcAlarmTimestamp;
+		descr += "</td>";
+
+		descr += "<td>";
+		descr += this.mesh.nodes[i].alarms.length;
+		descr += "</td>";
+		
+		descr += "</tr>"
+	}
+	descr += "</table>";	
+	this.dom.textNodesDescr.innerHTML = descr;
 }
 
 Sim.prototype.drawNodeLinks = function () 
 {
-	for(i in this.mesh.nodes)
+	if(this.ui.showNeigh)
 	{
-		var node = this.mesh.nodes[i];
-		
-		for(j in node.neigh)
+		for(i in this.mesh.nodes)
 		{
-			this.gfx.drawLine({c:"grey", x1:node.x, y1:node.y,
-								x2:node.neigh[j].x, y2:node.neigh[j].y});
+			var node = this.mesh.nodes[i];
 			
-			this.gfx.drawText({f:"12px Arial", 
-							   t:Math.floor(this.sqrDist(node.x, node.y, node.neigh[j].x, node.neigh[j].y)), 
-							   x:node.x+(node.neigh[j].x - node.x)/2, 
-							   y:node.y + (node.neigh[j].y - node.y)/2, 
-							   c:"black"});
-			
+			for(j in node.neigh)
+			{
+				var foundInList = false;
+				for(k in node.neigh[j].neigh)
+				{
+					if(node == node.neigh[j].neigh[k])
+					{
+						foundInList = true;
+					}
+				}
+				
+				if(!foundInList) //This neighbour is just in our list, probably a temporary neighbour
+				{
+					this.gfx.drawLine({c:"grey", x1:node.x, y1:node.y,
+										x2:node.neigh[j].x, y2:node.neigh[j].y, dash:[5,15]});
+				}
+				else if(node.mac < node.neigh[j].mac)//only draw one line, the one from the smallest of the 2 MACs
+				{
+					this.gfx.drawLine({c:"grey", x1:node.x, y1:node.y,
+										x2:node.neigh[j].x, y2:node.neigh[j].y});
+				}
+				
+				/*this.gfx.drawText({f:"12px Arial", 
+								   t:Math.floor(this.sqrDist(node.x, node.y, node.neigh[j].x, node.neigh[j].y)), 
+								   x:node.x+(node.neigh[j].x - node.x)/2, 
+								   y:node.y + (node.neigh[j].y - node.y)/2, 
+								   c:"black"});
+				*/
+			}
 		}
-	}
+	}	
 }
 
 Sim.prototype.drawFrame = function ()
 {
 	clearTimeout(sim.ui.frameTimeout);
-	sim.ui.frameTimeout = setTimeout(sim.drawFrame, 300);
+	sim.ui.frameTimeout = setTimeout(sim.drawFrame, 100);
 	
 	sim.gfx.drawBkg();
-	sim.drawNodes();
 	sim.drawNodeLinks();
+	sim.drawNodes();
+	sim.drawNodeDescr();
 } 
 
 //Mouse events

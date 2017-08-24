@@ -11,7 +11,7 @@
 <script type="text/javascript">
 function simInit()
 {
-	var meshSettings = {};
+	var meshSettings = {errorRate:1};
 	var gfxSettings = {gridSize:20, gridScale:1.0/4};
 	
 	mesh.init(meshSettings);
@@ -25,17 +25,19 @@ function simInit()
 
 <body onload="simInit()">
 <table>
-	<tr>
+	<tr colspan="2">
 		<td>
 			<input type="radio" id="addNode" name="nodeOp" value="addNode">AddNode</input>
 			<input type="radio" id="delNode" name="nodeOp" value="delNode">DelNode</input>
 
-			<input type="range" id="nodeRadius" name="nodeRadius" min=10 max=100></input><span id="textNodeRadius"></span>
+			<input type="range" id="nodeRadius" min=10 max=100></input><span id="textNodeRadius"></span>
 		</td>
 	</tr>
-	<tr>
+	<tr colspan="2">
 		<td>
-			<input type="checkbox" id="showGuides" name="showGuides" checked="true">ShowGuides</input>
+			<input type="checkbox" id="showGuides" checked="true">ShowGuides</input>
+			<input type="checkbox" id="showNeigh" checked="true">ShowNeighbours</input>
+			<input type="checkbox" id="showRoutes" checked="true">ShowRouteTable</input>
 		</td>
 	</tr>
 	<tr>
@@ -44,6 +46,9 @@ function simInit()
 			Canvas is not supported in your browser.
 		 </canvas>
 		</td> 
+		<td>
+			<span id="textNodesDescr"></span>
+		</td>
 	</tr> 
 </table>
 
