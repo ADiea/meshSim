@@ -89,9 +89,14 @@ Gfx.prototype.measureText = function(text)
 Gfx.prototype.drawCircle = function(circle)
 {
    this.ctx.strokeStyle = circle.c;
+   if(circle.dash)
+   {
+	   this.ctx.setLineDash(circle.dash);
+   }   
    this.ctx.beginPath();
    this.ctx.arc(circle.x, circle.y, circle.r, 0,2*Math.PI);
    this.ctx.stroke();
+   this.ctx.setLineDash([]);
 }
 
 Gfx.prototype.drawGuides = function(pt)

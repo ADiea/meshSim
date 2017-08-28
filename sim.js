@@ -16,6 +16,7 @@ Sim.prototype.init = function(gfx, mesh)
 	this.dom = {
 		addNode : document.getElementById("addNode"),
 		delNode : document.getElementById("delNode"),
+		pokeNode : document.getElementById("pokeNode"),
 		nodeRadius : document.getElementById("nodeRadius"),
 		showGuides : document.getElementById("showGuides"),
 		textNodeRadius : document.getElementById("textNodeRadius"),
@@ -26,7 +27,7 @@ Sim.prototype.init = function(gfx, mesh)
 
 	this.settings = {nodeHandle:15, nodeRadius:80};
 	this.flags = {nodeMoving:-1};	
-	this.ui = {showGuides:false, addNode:true, delNode:false, frameTimeout:null, showNeigh:true, showRoutes:true};
+	this.ui = {showGuides:false, addNode:true, delNode:false, pokeNode:false, frameTimeout:null, showNeigh:true, showRoutes:true};
 	
 	this.dom.showGuides.checked = this.ui.showGuides;
 	this.dom.showGuides.onchange = function() {sim.ui.showGuides = sim.dom.showGuides.checked;}
@@ -42,6 +43,7 @@ Sim.prototype.init = function(gfx, mesh)
 	{
 		sim.ui.addNode = sim.dom.addNode.checked;
 		sim.ui.delNode = !sim.ui.addNode;
+		sim.ui.pokeNode = !sim.ui.addNode;
 	}
 
 	this.dom.delNode.checked = this.ui.delNode;
@@ -49,6 +51,15 @@ Sim.prototype.init = function(gfx, mesh)
 	{
 		sim.ui.delNode = sim.dom.delNode.checked;
 		sim.ui.addNode = !sim.ui.delNode;
+		sim.ui.pokeNode = !sim.ui.delNode;
+	}
+	
+	this.dom.pokeNode.checked = this.ui.pokeNode;
+	this.dom.pokeNode.onchange = function() 
+	{
+		sim.ui.pokeNode = sim.dom.pokeNode.checked;
+		sim.ui.addNode = !sim.ui.pokeNode;
+		sim.ui.delNode = !sim.ui.pokeNode;
 	}
 	
 	this.dom.nodeRadius.value = this.settings.nodeRadius;
@@ -65,7 +76,7 @@ Sim.prototype.drawNodes = function ()
 	for(i in this.mesh.nodes)
 	{
 		var node = this.mesh.nodes[i];
-		this.gfx.drawCircle({x:node.x, y:node.y, r:this.settings.nodeHandle, c:"grey"});
+		this.gfx.drawCircle({x:node.x, y:node.y, r:this.settings.nodeHandle, c:node.isAwake?"blue":"black"});
 
 		var text = this.mesh.nodes[i].mac;
 		
@@ -75,7 +86,7 @@ Sim.prototype.drawNodes = function ()
 						   y:node.y + 6, 
 						   c:"red"});
 		
-		this.gfx.drawCircle({x:node.x, y:node.y, r:node.r, c:node.isAwake?"blue":"black"});
+		this.gfx.drawCircle({x:node.x, y:node.y, r:node.r, c:"grey", dash:[10,15]});
 	}
 }
 
@@ -83,7 +94,8 @@ Sim.prototype.drawNodeDescr = function()
 {
 	var descr = "<table border=\"1\">";
 	
-	descr += "<tr> <td>MAC</td> <td>Neigh</td> <td>Time</td> <td>RTC_Alarm</td> <td>#Alarms</td> </tr>";
+	descr += "<tr> <td>MAC</td> <td>Neigh</td> <td>Time</td> <td>RTC_Alarm</td> <td>#Alarms</td> " + 
+			 "<td>BatteryLife(mAh)</td> <td>AveBatDrain(mA)</td> <td>AppValues</td> <td>AppOvfErr</td> <td>AppData</td> </tr>";
 	
 	for(i in this.mesh.nodes)
 	{
@@ -95,10 +107,10 @@ Sim.prototype.drawNodeDescr = function()
 		descr += "]</td>";
 		
 		descr += "<td>";
-		descr += this.mesh.nodes[i].neigh.length + ": ";
-		for(j in this.mesh.nodes[i].neigh)
+		descr += this.mesh.nodes[i].net.neigh.length + ": ";
+		for(j in this.mesh.nodes[i].net.neigh)
 		{
-			descr += this.mesh.nodes[i].neigh[j].mac + " ";
+			descr += this.mesh.nodes[i].net.neigh[j].mac + " ";
 		}
 		descr += "</td>";
 
@@ -113,6 +125,38 @@ Sim.prototype.drawNodeDescr = function()
 		descr += "<td>";
 		descr += this.mesh.nodes[i].alarms.length;
 		descr += "</td>";
+
+		descr += "<td>";
+		descr += Math.round(100*(this.mesh.nodes[i].mAhRemaining/3000) * 100) / 100;
+		descr += "% (";
+		descr += Math.round((this.mesh.nodes[i].mAhRemaining) * 100) / 100;
+		descr += ")</td>";		
+
+		descr += "<td>";
+		descr += Math.round(((3000 - this.mesh.nodes[i].mAhRemaining)/(this.mesh.nodes[i].rtcTimestamp/3600.0)) * 100) / 100;
+		descr += "</td>";			
+	
+		descr += "<td>";
+		descr += this.mesh.nodes[i].app.values.length;
+		descr += "</td>";
+
+		descr += "<td>";
+		descr += this.mesh.nodes[i].app.errOverflow;
+		descr += "</td>";
+		
+		descr += "<td>";
+		
+		if(this.mesh.nodes[i].app.dataAllSensors.length)
+		{
+			for(j in this.mesh.nodes[i].app.dataAllSensors)
+			{
+				var record = this.mesh.nodes[i].app.dataAllSensors[j];
+				descr += "(" + record.from + "):" + record.data.length + "<br/>";
+			}
+		}
+		
+		descr += "</td>";
+		
 		
 		descr += "</tr>"
 	}
@@ -128,12 +172,12 @@ Sim.prototype.drawNodeLinks = function ()
 		{
 			var node = this.mesh.nodes[i];
 			
-			for(j in node.neigh)
+			for(j in node.net.neigh)
 			{
 				var foundInList = false;
-				for(k in node.neigh[j].neigh)
+				for(k in node.net.neigh[j].net.neigh)
 				{
-					if(node == node.neigh[j].neigh[k])
+					if(node == node.net.neigh[j].net.neigh[k])
 					{
 						foundInList = true;
 					}
@@ -142,18 +186,18 @@ Sim.prototype.drawNodeLinks = function ()
 				if(!foundInList) //This neighbour is just in our list, probably a temporary neighbour
 				{
 					this.gfx.drawLine({c:"grey", x1:node.x, y1:node.y,
-										x2:node.neigh[j].x, y2:node.neigh[j].y, dash:[5,15]});
+										x2:node.net.neigh[j].x, y2:node.net.neigh[j].y, dash:[5,15]});
 				}
-				else if(node.mac < node.neigh[j].mac)//only draw one line, the one from the smallest of the 2 MACs
+				else if(node.mac < node.net.neigh[j].mac)//only draw one line, the one from the smallest of the 2 MACs
 				{
 					this.gfx.drawLine({c:"grey", x1:node.x, y1:node.y,
-										x2:node.neigh[j].x, y2:node.neigh[j].y});
+										x2:node.net.neigh[j].x, y2:node.net.neigh[j].y});
 				}
 				
 				/*this.gfx.drawText({f:"12px Arial", 
-								   t:Math.floor(this.sqrDist(node.x, node.y, node.neigh[j].x, node.neigh[j].y)), 
-								   x:node.x+(node.neigh[j].x - node.x)/2, 
-								   y:node.y + (node.neigh[j].y - node.y)/2, 
+								   t:Math.floor(this.sqrDist(node.x, node.y, node.net.neigh[j].x, node.net.neigh[j].y)), 
+								   x:node.x+(node.net.neigh[j].x - node.x)/2, 
+								   y:node.y + (node.net.neigh[j].y - node.y)/2, 
 								   c:"black"});
 				*/
 			}
@@ -210,6 +254,19 @@ Sim.prototype.mousemove = function (pt)
 			this.gfx.setCursor("crosshair");
 		}		
 	}
+	else if(sim.ui.pokeNode)
+	{
+		if(idxNodeFound != -1)
+		{	
+			//var node = this.mesh.nodes[idxNodeFound];
+			this.gfx.setCursor("help");
+			//this.gfx.drawCircle({x:node.x, y:node.y, r:node.r, c:"red"});
+		}
+		else
+		{
+			this.gfx.setCursor("crosshair");
+		}			
+	}
 }
 
 Sim.prototype.mousedown = function (pt)
@@ -247,6 +304,14 @@ Sim.prototype.mouseup = function (pt)
 		if(idxNodeFound != -1)
 		{
 			this.mesh.delNode(idxNodeFound);
+		}
+	}
+	else if(sim.ui.pokeNode)
+	{
+		var idxNodeFound = this.findNode(pt);	
+		if(idxNodeFound != -1)
+		{
+			this.mesh.nodes[idxNodeFound].app.getAllValues();
 		}
 	}
 	this.drawFrame();

@@ -7,6 +7,8 @@
 <script type="text/javascript" src="gfx.js"></script>
 <script type="text/javascript" src="mesh.js"></script>
 <script type="text/javascript" src="node.js"></script>
+<script type="text/javascript" src="node-net.js"></script>
+<script type="text/javascript" src="node-app.js"></script>
 <script type="text/javascript" src="sim.js"></script>
 <script type="text/javascript">
 function simInit()
@@ -29,6 +31,7 @@ function simInit()
 		<td>
 			<input type="radio" id="addNode" name="nodeOp" value="addNode">AddNode</input>
 			<input type="radio" id="delNode" name="nodeOp" value="delNode">DelNode</input>
+			<input type="radio" id="pokeNode" name="nodeOp" value="pokeNode">PokeNode</input>
 
 			<input type="range" id="nodeRadius" min=10 max=100></input><span id="textNodeRadius"></span>
 		</td>
