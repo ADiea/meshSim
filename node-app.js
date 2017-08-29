@@ -33,11 +33,11 @@ NodeApp.prototype.processMessage = function(msg)
 	{
 		if(msg.action == "replyValues")
 		{
-			this.dataAllSensors.push({from:msg.from.mac, data:msg.data});
+			this.dataAllSensors.push({from:msg.from, data:msg.data});
 		}
 		else if(msg.action == "getValues")
 		{
-			this.node.sendMsg({from:this.node, to:msg.from, type:"app", action:"replyValues", data:this.values});
+			this.node.sendMsg({from:this.node.mac, to:msg.from, type:"app", action:"replyValues", data:this.values});
 		}
 	}
 }
@@ -54,7 +54,7 @@ NodeApp.prototype.getAllValues = function()
 		
 		//if(this.node.net.getRoute(nodeMac))
 		//{
-			this.node.sendMsg({from:this.node, to:node, type:"app", action:"getValues"});
+			this.node.sendMsg({from:this.node.mac, to:node.mac, type:"app", action:"getValues"});
 		//}
 		//else
 		//{

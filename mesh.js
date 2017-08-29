@@ -10,6 +10,16 @@ function Mesh()
 	this.uniqueId = 1;
 }
 
+Mesh.prototype.getNode = function(mac)
+{
+	for(var i in this.nodes)
+	{
+		if(mac == this.nodes[i].mac)
+				return this.nodes[i];
+	}
+	return null;
+}
+
 Mesh.prototype.init = function(settings)
 {
 	this.settings = settings;
@@ -46,25 +56,25 @@ Mesh.prototype.sendMsg = function(msg)
 	if(Math.floor(100 * Math.random()) < this.settings.errorRate)
 		return;
 	
-	if(msg.to)
+	if(this.getNode(msg.to))
 	{
-		if(this.sqrDist(msg.from.x, msg.from.y, 
-						msg.to.x, msg.to.y) < 
-						msg.from.r + msg.to.r)
+		if(this.sqrDist(this.getNode(msg.from).x, this.getNode(msg.from).y, 
+						this.getNode(msg.to).x, this.getNode(msg.to).y) < 
+						this.getNode(msg.from).r + this.getNode(msg.to).r)
 		{
-			msg.to.onRecvMsg(JSON.parse(JSON.stringify(msg)));
+			this.getNode(msg.to).onRecvMsg(JSON.parse(JSON.stringify(msg)));
 		}
 	}
 	else //broadcast
 	{
 		for(var i in this.nodes)
 		{
-			if(msg.from == this.nodes[i])
+			if(msg.from == this.nodes[i].mac)
 				continue;
 			
-			if(this.sqrDist(msg.from.x, msg.from.y, 
+			if(this.sqrDist(this.getNode(msg.from).x, this.getNode(msg.from).y, 
 							this.nodes[i].x, this.nodes[i].y) < 
-			   msg.from.r + this.nodes[i].r)
+			   this.getNode(msg.from).r + this.nodes[i].r)
 			{
 				this.nodes[i].onRecvMsg(JSON.parse(JSON.stringify(msg)));
 			}
