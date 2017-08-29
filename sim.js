@@ -94,8 +94,8 @@ Sim.prototype.drawNodeDescr = function()
 {
 	var descr = "<table border=\"1\">";
 	
-	descr += "<tr> <td>MAC</td> <td>Neigh</td> <td>Time</td> <td>RTC_Alarm</td> <td>#Alarms</td> " + 
-			 "<td>BatteryLife(mAh)</td> <td>AveBatDrain(mA)</td> <td>AppValues</td> <td>AppOvfErr</td> <td>AppData</td> </tr>";
+	descr += "<tr> <td>MAC</td> <td>Neigh</td> <td>Time</td> <td>RTC_Al</td> <td>#Alr</td> " + 
+			 "<td>BatLife(mAh)</td> <td>BatDr(mA)</td> <td>AppOvfErr</td> <td>AppData</td> </tr>";
 	
 	for(i in this.mesh.nodes)
 	{
@@ -135,10 +135,7 @@ Sim.prototype.drawNodeDescr = function()
 		descr += "<td>";
 		descr += Math.round(((3000 - this.mesh.nodes[i].mAhRemaining)/(this.mesh.nodes[i].rtcTimestamp/3600.0)) * 100) / 100;
 		descr += "</td>";			
-	
-		descr += "<td>";
-		descr += this.mesh.nodes[i].app.values.length;
-		descr += "</td>";
+
 
 		descr += "<td>";
 		descr += this.mesh.nodes[i].app.errOverflow;

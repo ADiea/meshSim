@@ -190,7 +190,16 @@ Node.prototype.onRTCTick = function()
 Node.prototype.sendMsg = function(msg)
 {
 	this.batDrain(85, .01);
-	this.mesh.sendMsg(msg);
+	
+	if(!msg.to || 
+		this.net.neigh.indexOf(msg.to) != -1)
+	{
+		this.node.mesh.sendMsg(msg);
+	}
+	else
+	{
+		this.net.routeMessage(msg);
+	}
 }
 
 Node.prototype.onRecvMsg = function(msg)

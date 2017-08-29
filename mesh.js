@@ -52,7 +52,7 @@ Mesh.prototype.sendMsg = function(msg)
 						msg.to.x, msg.to.y) < 
 						msg.from.r + msg.to.r)
 		{
-			msg.to.onRecvMsg(msg);
+			msg.to.onRecvMsg(JSON.parse(JSON.stringify(msg)));
 		}
 	}
 	else //broadcast
@@ -61,11 +61,12 @@ Mesh.prototype.sendMsg = function(msg)
 		{
 			if(msg.from == this.nodes[i])
 				continue;
+			
 			if(this.sqrDist(msg.from.x, msg.from.y, 
 							this.nodes[i].x, this.nodes[i].y) < 
 			   msg.from.r + this.nodes[i].r)
 			{
-				this.nodes[i].onRecvMsg(msg);
+				this.nodes[i].onRecvMsg(JSON.parse(JSON.stringify(msg)));
 			}
 		}
 	}
