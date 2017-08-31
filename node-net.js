@@ -5,9 +5,19 @@
 
 /*
 
-todo: link power negociation
+todo: 
+link:
+link power negociation
 
-6.7 rfc
+network:
+send seq from current to next hop to have implicit route
+
+debug alternatives not yet working ok.
+choose best alt based on last battery level
+hello with battery level
+
+implement error frame
+if bat level <10 send error frame
 
 */
 
@@ -64,12 +74,7 @@ NodeNet.prototype.processMessage = function(msg)
 		
 		if(msg.action == "request")
 		{
-			var route = this.getRouteEntry(msg.route.from);
-			if(route && route.lastReqId >= msg.route.id)
-			{
-				//discard this message
-				return;
-			}
+			//todo: filter requests with same id here and discard alt posibilities
 			
 			if(msg.route.to == this.node.mac)
 			{
@@ -78,11 +83,24 @@ NodeNet.prototype.processMessage = function(msg)
 					this.routeSeq++;
 				}
 				
-				this.node.sendMsg({from:this.node.mac, to:msg.from, type:"route", action:"reply", 
+				//not node.route = route outgoing this will use current routing table instead of replying to sender
+				this.node.mesh.sendMsg({from:this.node.mac, to:msg.from, type:"route", action:"reply", 
 									route:{to:msg.route.from, seqDest:this.routeSeq, from:this.node.mac, hops:0, ttl:32}});
 			}
 			else
 			{
+				
+				var route = this.getRouteEntry(msg.route.from);
+				if(route && route.lastReqId >= msg.route.id)
+				{
+					//discard this message
+					return;
+				}
+				else
+				{
+					route.lastReqId = msg.route.id;
+				}
+				
 				this.routeRoutingPkg(msg);
 			}
 		}
@@ -94,7 +112,8 @@ NodeNet.prototype.processMessage = function(msg)
 							
 				if(route)
 				{
-					if(route.hops > msg.route.hops || !route.isActive || route.seq < msg.route.seqDest)
+					/*todo break this if e.g if sequences are eq then compare hops*/
+					if(route.hops > msg.route.hops || !route.isValid || route.seq < msg.route.seqDest)
 					{
 						route.nextHop = msg.from;
 						route.hops = msg.route.hops;
@@ -127,31 +146,18 @@ NodeNet.prototype.processMessage = function(msg)
 	}	
 }
 
-
-NodeNet.prototype.routeRoutingPkg = function(msg)
-{
-	msg.route.hops++;
-	msg.to = null; //broadcast
-	
-	var route = this.getRouteEntry(msg.route.to);
-	if(route && route.isValid)
-	{
-		msg.to = route.nextHop;
-	}
-
-	this.node.mesh.sendMsg(msg);
-}
-
-
 NodeNet.prototype.passiveUpdateRoutes = function(msg)
 {
 	//search prev node
-	var route = this.getRouteEntry(msg.from);
-	if(!route)
+	var routeNextHopDest = this.getRouteEntry(msg.from);
+	if(!routeNextHopDest)
 	{
-		this.routes.push({to:msg.from, nextHop: msg.from, hops:1, isValid:true, seq:-1, lastReqId:-1});
+		routeNextHopDest = {to:msg.from, nextHop: msg.from, hops:1, isValid:true, seq:-1, lastReqId:-1};
+		this.routes.push(routeNextHopDest);
 	}
 	
+	var route;
+	msg.route.hops++;
 	if(msg.action == "request")
 	{
 		//Search for the source
@@ -172,11 +178,12 @@ NodeNet.prototype.passiveUpdateRoutes = function(msg)
 			{
 				route.nextHop = msg.from;
 				route.hops = msg.route.hops;
-			}				
+			}
+			/*todo: keep multiple paths with different battery levels and same hopcount*/			
 		}
 		else
 		{
-			this.routes.push({to:msg.route.from, nextHop: msg.from, hops:msg.hops, isValid:true, seq:msg.route.seqSrc, lastReqId:msg.route.id});
+			this.routes.push({to:msg.route.from, nextHop: msg.from, hops:msg.route.hops, isValid:true, seq:msg.route.seqSrc, lastReqId:msg.route.id - 1});
 		}
 
 		//Search for the destination
@@ -196,8 +203,8 @@ NodeNet.prototype.passiveUpdateRoutes = function(msg)
 	}
 	else if(msg.action == "reply")
 	{
-		//Search for the destination
-		var route = this.getRouteEntry(msg.route.to);
+		//Search for the route destination = message surce
+		var route = this.getRouteEntry(msg.route.from);
 		
 		if(route)
 		{
@@ -211,42 +218,83 @@ NodeNet.prototype.passiveUpdateRoutes = function(msg)
 				}
 				route.seq = msg.route.seqDest;
 			}
-			else if(route.seq == msg.route.seqDest && route.hops > msg.route.hops)
+			else if(route.seq == msg.route.seqDest)
 			{
-				route.nextHop = msg.from;
-				route.hops = msg.route.hops;
+				if(route.hops > msg.route.hops)
+				{
+					route.nextHop = msg.from;
+					route.hops = msg.route.hops;
+				}
 			}	
+			
+			if(route.hops == msg.route.hops && route.nextHop != msg.from)
+			{
+				if(!route.alt)
+				{
+					route.alt = [];
+				}
+				
+				var alreadyInList = false;
+				for(iAlt in route.alt)
+				{
+					if(route.alt[iAlt].nextHop == msg.from)
+					{
+						alreadyInList = true;
+						break;
+					}
+				}
+				
+				if(!alreadyInList)
+				{
+					route.alt.push({to:msg.route.from, nextHop: msg.from, hops:msg.route.hops, isValid:true, seq:msg.route.seqDest, lastReqId:-1});
+				}
+			}
+			
+			/*todo: keep multiple paths with different battery levels and same hopcount*/
+		}
+		else
+		{
+			route = {to:msg.route.from, nextHop: msg.from, hops:msg.route.hops, isValid:true, seq:msg.route.seqDest, lastReqId:-1};
+			this.routes.push(route);
+		}
+
+		//Search for the route source  =message destination
+		var routeBack = this.getRouteEntry(msg.route.to);
+		if(routeBack)
+		{
+			//precursors
+			if(!route.precursors)
+			{
+				route.precursors = [];
+			}
+			if( -1 == route.precursors.indexOf(routeBack.nextHop))
+			{
+				route.precursors.push(routeBack.nextHop);
+			}
+			
+			if(!routeNextHopDest.precursors)
+			{
+				routeNextHopDest.precursors = [];
+			}
+			if( -1 ==routeNextHopDest.precursors.indexOf(routeBack.nextHop))
+			{
+				routeNextHopDest.precursors.push(routeBack.nextHop);
+			}
+		
+		/*
+			if(routeBack.seq < msg.route.seqDest)
+			{
+				routeBack.seq = msg.route.seqDest;
+			}
+			*/
 		}
 		else
 		{
 			this.routes.push({to:msg.route.to, nextHop: -1, hops:-1, isValid:false, seq:-1, lastReqId:-1});
+			
 		}
 		
-		//Search for the source
-		route = this.getRouteEntry(msg.route.from);
-		if(route)
-		{
-			var routeBack = this.getRouteEntry(msg.route.to);
-			if(!routeBack.precursors)
-			{
-				routeBack.precursors = [];
-			}
-			if(routeBack && -1 == routeBack.precursors.indexOf(routeBack.nextHop))
-			{
-				routeBack.precursors.push(routeBack.nextHop);
-			}
-			
-			if(route.seq < msg.route.seqDest)
-			{
-				route.seq = msg.route.seqDest;
-				/* todo: current route is invalid?
-				*/
-			}
-		}
-		else
-		{
-			this.routes.push({to:msg.route.from, nextHop: msg.from, hops:msg.hops, isValid:true, seq:msg.route.seqDest, lastReqId:-1});
-		}
+		
 	}
 	else if(msg.action == "error")
 	{
@@ -276,6 +324,7 @@ NodeNet.prototype.routeIncoming = function(msg)
 		if(route.isValid)
 		{
 			msg.to = route.nextHop;
+			msg.from = this.node.mac;
 			this.node.mesh.sendMsg(msg);
 		}
 		else
@@ -293,17 +342,36 @@ NodeNet.prototype.routeIncoming = function(msg)
 	return true;
 }
 
-NodeNet.prototype.routeOutgoing = function(msg)
+NodeNet.prototype.routeRoutingPkg = function(msg)
 {
 	
-	msg.route = {to:msg.to, from:this.node.mac};
-	var route = this.getRouteEntry(msg.to);
+	msg.to = null; //broadcast
+	msg.from = this.node.mac;
+	
+	var route = this.getRouteEntry(msg.route.to);
+	if(route && route.isValid)
+	{
+		msg.to = route.nextHop;
+	}
+
+	this.node.mesh.sendMsg(msg);
+}
+
+NodeNet.prototype.routeOutgoing = function(msg)
+{
+	if(!msg.route)
+	{
+		msg.route = {to:msg.to, from:this.node.mac};
+	}
+	
+	var route = this.getRouteEntry(msg.route.to);
 	
 	if(route)
 	{
 		if(route.isValid)
 		{
 			msg.to = route.nextHop;
+			msg.from = this.node.mac;
 			this.node.mesh.sendMsg(msg);
 		}
 		else
@@ -333,7 +401,7 @@ NodeNet.prototype.startRouteDiscovery = function(mac, lastSeq)
 	}
 	else 
 	{
-		this.routes.push({isValid:false, to:this.node.mac, lastReqId:this.routeReqId});
+		this.routes.push({to:this.node.mac, nextHop:this.node.mac, hops:0, isValid:false, seq:this.routeSeq, lastReqId:this.routeReqId});
 	}
 	
 	this.node.mesh.sendMsg({from:this.node.mac, to:null, type:"route", action:"request", 

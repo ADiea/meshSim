@@ -22,12 +22,17 @@ Sim.prototype.init = function(gfx, mesh)
 		textNodeRadius : document.getElementById("textNodeRadius"),
 		showNeigh : document.getElementById("showNeigh"),
 		showRoutes : document.getElementById("showRoutes"),
+		showRoutesFrom : document.getElementById("showRoutesFrom"),
+		showRoutesTo : document.getElementById("showRoutesTo"),
 		textNodesDescr : document.getElementById("textNodesDescr"),
 	};
 
 	this.settings = {nodeHandle:15, nodeRadius:80};
 	this.flags = {nodeMoving:-1};	
-	this.ui = {showGuides:false, addNode:true, delNode:false, pokeNode:false, frameTimeout:null, showNeigh:true, showRoutes:true};
+	this.ui = {showGuides:false, addNode:true, delNode:false, pokeNode:false, frameTimeout:null, showNeigh:false, showRoutes:true, 
+				showRoutesFrom:-1, showRoutesTo:-1};
+				
+	this.curCursorPt = {x:-100, y:-100};
 	
 	this.dom.showGuides.checked = this.ui.showGuides;
 	this.dom.showGuides.onchange = function() {sim.ui.showGuides = sim.dom.showGuides.checked;}
@@ -37,6 +42,12 @@ Sim.prototype.init = function(gfx, mesh)
 
 	this.dom.showRoutes.checked = this.ui.showRoutes;
 	this.dom.showRoutes.onchange = function() {sim.ui.showRoutes = sim.dom.showRoutes.checked;}
+	
+	this.dom.showRoutesFrom.value = this.ui.showRoutesFrom;
+	this.dom.showRoutesFrom.onchange = function() {sim.ui.showRoutesFrom = parseInt(sim.dom.showRoutesFrom.value);}
+
+	this.dom.showRoutesTo.value = this.ui.showRoutesTo;
+	this.dom.showRoutesTo.onchange = function() {sim.ui.showRoutesTo = parseInt(sim.dom.showRoutesTo.value);}
 	
 	this.dom.addNode.checked = this.ui.addNode;
 	this.dom.addNode.onchange = function() 
@@ -69,6 +80,8 @@ Sim.prototype.init = function(gfx, mesh)
 		sim.settings.nodeRadius = sim.dom.nodeRadius.value;
 		sim.dom.textNodeRadius.innerText = "NodeRadius:"+sim.settings.nodeRadius;
 	}
+	
+	
 }
 
 Sim.prototype.drawNodes = function () 
@@ -92,10 +105,10 @@ Sim.prototype.drawNodes = function ()
 
 Sim.prototype.drawNodeDescr = function()
 {
-	var descr = "<table border=\"1\">";
+	var descr = "<table border=\"1\" style=\"white-space: nowrap;\">";
 	
-	descr += "<tr> <td>MAC</td> <td>Neigh</td> <td>Time</td> <td>RTC_Al</td> <td>#Alr</td> " + 
-			 "<td>BatLife(mAh)</td> <td>BatDr(mA)</td> <td>AppOvfErr</td> <td>AppData</td> </tr>";
+	descr += "<tr> <td>MAC</td> <!--<td>Neigh</td>--> <td>Time</td> <!-- <td>RTC_Al</td> <td>#Alr</td> --> " + 
+			 "<td>BatLife(mAh)</td> <td>BatDr(mA)</td> <!--<td>AppOvfErr</td>--> <td>AppData</td> <td>Routes</td> </tr>";
 	
 	for(i in this.mesh.nodes)
 	{
@@ -106,6 +119,7 @@ Sim.prototype.drawNodeDescr = function()
 		descr += this.mesh.nodes[i].mac;
 		descr += "]</td>";
 		
+		/*
 		descr += "<td>";
 		descr += this.mesh.nodes[i].net.neigh.length + ": ";
 		for(j in this.mesh.nodes[i].net.neigh)
@@ -113,11 +127,13 @@ Sim.prototype.drawNodeDescr = function()
 			descr += this.mesh.nodes[i].net.neigh[j].mac + " ";
 		}
 		descr += "</td>";
+		*/
 
 		descr += "<td>";
 		descr += this.mesh.nodes[i].rtcTimestamp;
 		descr += "</td>";
 
+/*		
 		descr += "<td>";
 		descr += this.mesh.nodes[i].rtcAlarmTimestamp;
 		descr += "</td>";
@@ -125,24 +141,27 @@ Sim.prototype.drawNodeDescr = function()
 		descr += "<td>";
 		descr += this.mesh.nodes[i].alarms.length;
 		descr += "</td>";
-
+*/
+		
 		descr += "<td>";
-		descr += Math.round(100*(this.mesh.nodes[i].mAhRemaining/3000) * 100) / 100;
+		descr += Math.round(100*(this.mesh.nodes[i].mAhRemaining/3000) * 100) / 100 + "%";
+		/*
 		descr += "% (";
-		descr += Math.round((this.mesh.nodes[i].mAhRemaining) * 100) / 100;
-		descr += ")</td>";		
+		descr += Math.round((this.mesh.nodes[i].mAhRemaining) * 100) / 100 + ")";
+		*/
+		descr += "</td>";		
 
 		descr += "<td>";
-		descr += Math.round(((3000 - this.mesh.nodes[i].mAhRemaining)/(this.mesh.nodes[i].rtcTimestamp/3600.0)) * 100) / 100;
+		descr += Math.round(((this.mesh.nodes[i].mAhRemainingInitial - this.mesh.nodes[i].mAhRemaining)/(this.mesh.nodes[i].rtcTimestamp/3600.0)) * 100) / 100;
 		descr += "</td>";			
 
-
+/*
 		descr += "<td>";
 		descr += this.mesh.nodes[i].app.errOverflow;
 		descr += "</td>";
+*/
 		
-		descr += "<td>";
-		
+		descr += "<td>";		
 		if(this.mesh.nodes[i].app.dataAllSensors.length)
 		{
 			for(j in this.mesh.nodes[i].app.dataAllSensors)
@@ -151,14 +170,72 @@ Sim.prototype.drawNodeDescr = function()
 				descr += "(" + record.from + "):" + record.data.length + "<br/>";
 			}
 		}
-		
 		descr += "</td>";
 		
+		descr += "<td>";
+		var routesTo = [];
+		var noRoutesTo = [];
+		
+		for(j in this.mesh.nodes[i].net.routes)
+		{
+			descr += JSON.stringify(this.mesh.nodes[i].net.routes[j]).replace(/\"/g, "") + "<br/>";
+			routesTo.push(this.mesh.nodes[i].net.routes[j].to);
+		}
+		
+		for(j in this.mesh.nodes)
+		{
+			if(routesTo.indexOf(this.mesh.nodes[j].mac) == -1)
+			{
+				noRoutesTo.push(this.mesh.nodes[j].mac);
+			}				
+		}
+		
+		if(noRoutesTo.length)
+		{
+			descr += "----- No routes to: " + noRoutesTo;
+		}
+		
+		descr += "</td>";
 		
 		descr += "</tr>"
 	}
 	descr += "</table>";	
 	this.dom.textNodesDescr.innerHTML = descr;
+}
+
+Sim.prototype.drawRoutes = function () 
+{
+	if(this.ui.showRoutes)
+	{
+		var curNode = this.mesh.getNode(this.ui.showRoutesFrom);
+		var route;
+		if(curNode)
+		{
+			do
+			{
+				route = curNode.net.getRouteEntry(this.ui.showRoutesTo);
+				if(!route)
+					break;
+				
+				var nextNode = this.mesh.getNode(route.nextHop);
+				if(!nextNode)
+					break;
+				
+				this.gfx.drawLine({c:"grey", x1:curNode.x, y1:curNode.y,
+									x2:nextNode.x, y2:nextNode.y});
+									
+				for(i in route.alt)
+				{
+					var nextAlt = this.mesh.getNode(route.alt[i].nextHop);
+					this.gfx.drawLine({c:"red", x1:curNode.x, y1:curNode.y,
+									x2:nextAlt.x, y2:nextAlt.y, dash:[5,10]});
+				}
+
+				curNode = nextNode;
+
+			}while(curNode.mac != this.ui.showRoutesTo);
+		}
+	}
 }
 
 Sim.prototype.drawNodeLinks = function () 
@@ -208,7 +285,17 @@ Sim.prototype.drawFrame = function ()
 	sim.ui.frameTimeout = setTimeout(sim.drawFrame, 100);
 	
 	sim.gfx.drawBkg();
+	
+	if(sim.drawMoveGuides)
+	{
+			sim.gfx.drawCircle({x:sim.curCursorPt.x, y:sim.curCursorPt.y, r:sim.settings.nodeRadius, c:"lightgrey"});
+			if(sim.ui.showGuides)
+				sim.gfx.drawGuides(sim.curCursorPt);
+	}
+	
 	sim.drawNodeLinks();
+
+	sim.drawRoutes();
 	sim.drawNodes();
 	sim.drawNodeDescr();
 } 
@@ -217,8 +304,10 @@ Sim.prototype.drawFrame = function ()
 
 Sim.prototype.mousemove = function (pt) 
 {
-	var idxNodeFound = this.findNode(pt);	
+	this.curCursorPt = pt;
+	var idxNodeFound = this.findNode(pt);
 	this.drawFrame(); //first draw frame
+	this.drawMoveGuides = false;	
 	if(this.ui.addNode)
 	{
 		if(this.flags.nodeMoving != -1)
@@ -233,9 +322,11 @@ Sim.prototype.mousemove = function (pt)
 		else
 		{
 			this.gfx.setCursor("crosshair");
-			this.gfx.drawCircle({x:pt.x, y:pt.y, r:this.settings.nodeRadius, c:"lightgrey"});
+			this.drawMoveGuides = true;
+			
+			this.gfx.drawCircle({x:this.curCursorPt.x, y:this.curCursorPt.y, r:this.settings.nodeRadius, c:"lightgrey"});
 			if(this.ui.showGuides)
-				this.gfx.drawGuides(pt);
+				this.gfx.drawGuides(this.curCursorPt);
 		}
 	}
 	else if(this.ui.delNode)
@@ -257,6 +348,7 @@ Sim.prototype.mousemove = function (pt)
 		{	
 			//var node = this.mesh.nodes[idxNodeFound];
 			this.gfx.setCursor("help");
+			this.ui.showRoutesTo = this.dom.showRoutesTo.value = this.mesh.nodes[idxNodeFound].mac;
 			//this.gfx.drawCircle({x:node.x, y:node.y, r:node.r, c:"red"});
 		}
 		else
@@ -309,6 +401,8 @@ Sim.prototype.mouseup = function (pt)
 		if(idxNodeFound != -1)
 		{
 			this.mesh.nodes[idxNodeFound].app.getAllValues();
+			
+			this.ui.showRoutesFrom = this.dom.showRoutesFrom.value = this.mesh.nodes[idxNodeFound].mac;
 		}
 	}
 	this.drawFrame();

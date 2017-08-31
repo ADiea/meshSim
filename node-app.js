@@ -33,11 +33,11 @@ NodeApp.prototype.processMessage = function(msg)
 	{
 		if(msg.action == "replyValues")
 		{
-			this.dataAllSensors.push({from:msg.from, data:msg.data});
+			this.dataAllSensors.push({from:msg.route.from, data:msg.data});
 		}
 		else if(msg.action == "getValues")
 		{
-			this.node.sendMsg({from:this.node.mac, to:msg.from, type:"app", action:"replyValues", data:this.values});
+			this.node.sendMsg({from:this.node.mac, to:msg.route.from, type:"app", action:"replyValues", data:this.values});
 		}
 	}
 }
