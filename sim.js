@@ -17,7 +17,7 @@ Sim.prototype.init = function(gfx, mesh)
 		addNode : document.getElementById("addNode"),
 		delNode : document.getElementById("delNode"),
 		pokeNode : document.getElementById("pokeNode"),
-		nodeRadius : document.getElementById("nodeRadius"),
+		//nodeRadius : document.getElementById("nodeRadius"),
 		showGuides : document.getElementById("showGuides"),
 		textNodeRadius : document.getElementById("textNodeRadius"),
 		showNeigh : document.getElementById("showNeigh"),
@@ -25,12 +25,14 @@ Sim.prototype.init = function(gfx, mesh)
 		showRoutesFrom : document.getElementById("showRoutesFrom"),
 		showRoutesTo : document.getElementById("showRoutesTo"),
 		textNodesDescr : document.getElementById("textNodesDescr"),
+		snapDistance : document.getElementById("snapDistance"),
+		
 	};
 
-	this.settings = {nodeHandle:15, nodeRadius:80};
+	this.settings = {nodeHandle:10, nodeRadius:this.mesh.getMaxSafeTXRadius()};
 	this.flags = {nodeMoving:-1};	
 	this.ui = {showGuides:false, addNode:true, delNode:false, pokeNode:false, frameTimeout:null, showNeigh:false, showRoutes:true, 
-				showRoutesFrom:-1, showRoutesTo:-1};
+				showRoutesFrom:-1, showRoutesTo:-1, snapDistance:1};
 				
 	this.curCursorPt = {x:-100, y:-100};
 	
@@ -48,6 +50,11 @@ Sim.prototype.init = function(gfx, mesh)
 
 	this.dom.showRoutesTo.value = this.ui.showRoutesTo;
 	this.dom.showRoutesTo.onchange = function() {sim.ui.showRoutesTo = parseInt(sim.dom.showRoutesTo.value);}
+
+	this.dom.snapDistance.value = this.ui.snapDistance;
+	this.dom.snapDistance.onchange = function() {sim.ui.snapDistance = parseInt(sim.dom.snapDistance.value);}
+	
+	
 	
 	this.dom.addNode.checked = this.ui.addNode;
 	this.dom.addNode.onchange = function() 
@@ -72,14 +79,14 @@ Sim.prototype.init = function(gfx, mesh)
 		sim.ui.addNode = !sim.ui.pokeNode;
 		sim.ui.delNode = !sim.ui.pokeNode;
 	}
-	
+	/*
 	this.dom.nodeRadius.value = this.settings.nodeRadius;
 	this.dom.textNodeRadius.innerText = "NodeRadius:"+this.settings.nodeRadius;
 	this.dom.nodeRadius.onchange = function() 
 	{
 		sim.settings.nodeRadius = sim.dom.nodeRadius.value;
 		sim.dom.textNodeRadius.innerText = "NodeRadius:"+sim.settings.nodeRadius;
-	}
+	}*/
 	
 	
 }
@@ -98,17 +105,39 @@ Sim.prototype.drawNodes = function ()
 						   x:node.x - gfx.measureText({t:text, f:"14px Arial"}).width/2, 
 						   y:node.y + 6, 
 						   c:"red"});
-		
-		this.gfx.drawCircle({x:node.x, y:node.y, r:node.r, c:"grey", dash:[10,15]});
+		var nodeRssiRadius = this.mesh.getRssiRadius(node.mac, this.mesh.kSafeRSSI);
+		this.gfx.drawCircle({x:node.x, y:node.y, r:nodeRssiRadius, c:"grey", dash:[10,15]});
 	}
 }
 
 Sim.prototype.drawNodeDescr = function()
 {
 	var descr = "<table border=\"1\" style=\"white-space: nowrap;\">";
+	descr += "<tr> <td> #Bcast </td> <td>#Unicast</td> <td>#Failed</td> </tr>";
 	
-	descr += "<tr> <td>MAC</td> <!--<td>Neigh</td>--> <td>Time</td> <!-- <td>RTC_Al</td> <td>#Alr</td> --> " + 
-			 "<td>BatLife(mAh)</td> <td>BatDr(mA)</td> <!--<td>AppOvfErr</td>--> <td>AppData</td> <td>Routes</td> </tr>";
+	var totalPkts = this.mesh.stats.unicastPkts + this.mesh.stats.failedPkts + this.mesh.stats.bcastPkts;
+	
+	descr += "<tr><td>" + this.mesh.stats.bcastPkts + " (" + Math.round((this.mesh.stats.bcastPkts/totalPkts) * 100) +"% )" + "</td>";
+	
+	descr += "<td>" + this.mesh.stats.unicastPkts + " (" + Math.round((this.mesh.stats.unicastPkts/totalPkts) * 100) +"% )</td>";
+
+	descr += "<td>" + this.mesh.stats.failedPkts + " (" + Math.round((this.mesh.stats.failedPkts/totalPkts) * 100) +"% )"+ "</td>"; 
+		
+	descr += "</tr> </table>"
+	
+	descr += "<table border=\"1\" style=\"white-space: nowrap;\"><tr>";
+	for(i in this.mesh.stats.pktTypes)
+	{
+		var type = this.mesh.stats.pktTypes[i];
+		descr += "<td>" + type.type + " : " + type.n + " </td>";
+	}
+	descr += "</tr> </table>";
+	
+	
+	descr += "<table border=\"1\" style=\"white-space: nowrap;\">";
+	
+	descr += "<tr> <td>MAC</td> <td>Neigh</td> <td>Time</br<(Alarm)</td> <!-- <td>RTC_Al</td> <td>#Alr</td> --> " + 
+			 "<td>BatLife</td> <td>BatDr(mA)</td> <!--<td>AppOvfErr</td>--> <td>AppData</td> <td>Routes</td> </tr>";
 	
 	for(i in this.mesh.nodes)
 	{
@@ -119,19 +148,29 @@ Sim.prototype.drawNodeDescr = function()
 		descr += this.mesh.nodes[i].mac;
 		descr += "]</td>";
 		
-		/*
+		
 		descr += "<td>";
-		descr += this.mesh.nodes[i].net.neigh.length + ": ";
+		//descr += this.mesh.nodes[i].net.neigh.length + ": ";
 		for(j in this.mesh.nodes[i].net.neigh)
 		{
-			descr += this.mesh.nodes[i].net.neigh[j].mac + " ";
+			descr += JSON.stringify(this.mesh.nodes[i].net.neigh[j]) + "</br>";
 		}
 		descr += "</td>";
-		*/
+		
 
+		var h = Math.floor(this.mesh.nodes[i].rtcTimestamp/3600);
+		var m = Math.floor((this.mesh.nodes[i].rtcTimestamp - h*3600)/60);
+		var s = (this.mesh.nodes[i].rtcTimestamp - h*3600 - m*60);
 		descr += "<td>";
-		descr += this.mesh.nodes[i].rtcTimestamp;
-		descr += "</td>";
+		descr += h + ":" + m + ":" + s + "</br>(-";
+		
+		var remainingToAlarm = this.mesh.nodes[i].rtcAlarmTimestamp - this.mesh.nodes[i].rtcTimestamp;
+		h = Math.floor(remainingToAlarm/3600);
+		m = Math.floor((remainingToAlarm - h*3600)/60);
+		s = (remainingToAlarm - h*3600 - m*60);
+		
+		
+		descr += h + ":" + m + ":" + s + ")</td>";
 
 /*		
 		descr += "<td>";
@@ -221,8 +260,8 @@ Sim.prototype.drawRoutes = function ()
 				if(!nextNode)
 					break;
 				
-				this.gfx.drawLine({c:"grey", x1:curNode.x, y1:curNode.y,
-									x2:nextNode.x, y2:nextNode.y});
+				this.gfx.drawLine({c:"red", x1:curNode.x, y1:curNode.y,
+									x2:nextNode.x, y2:nextNode.y, dash:[5,10]});
 									
 				for(i in route.alt)
 				{
@@ -230,8 +269,16 @@ Sim.prototype.drawRoutes = function ()
 					this.gfx.drawLine({c:"red", x1:curNode.x, y1:curNode.y,
 									x2:nextAlt.x, y2:nextAlt.y, dash:[5,10]});
 				}
+				
+				var bestRoute = this.mesh.getNode(curNode.net.getBestHop(route));
+				
+				if(bestRoute)
+				{
+					this.gfx.drawLine({c:"black", x1:curNode.x, y1:curNode.y,
+										x2:bestRoute.x, y2:bestRoute.y});
+				}
 
-				curNode = nextNode;
+				curNode = bestRoute ? bestRoute : nextNode;
 
 			}while(curNode.mac != this.ui.showRoutesTo);
 		}
@@ -242,38 +289,18 @@ Sim.prototype.drawNodeLinks = function ()
 {
 	if(this.ui.showNeigh)
 	{
-		for(i in this.mesh.nodes)
-		{
-			var node = this.mesh.nodes[i];
-			
-			for(j in node.net.neigh)
+		var node = this.mesh.getNode(this.ui.showRoutesTo);		
+		if(node)
+		{	
+			for(i in node.net.neigh)
 			{
-				var foundInList = false;
-				for(k in node.net.neigh[j].net.neigh)
-				{
-					if(node == node.net.neigh[j].net.neigh[k])
-					{
-						foundInList = true;
-					}
-				}
+				var nodeTo = this.mesh.getNode(node.net.neigh[i].mac);
 				
-				if(!foundInList) //This neighbour is just in our list, probably a temporary neighbour
+				if(nodeTo)
 				{
 					this.gfx.drawLine({c:"grey", x1:node.x, y1:node.y,
-										x2:node.net.neigh[j].x, y2:node.net.neigh[j].y, dash:[5,15]});
+											x2:nodeTo.x, y2:nodeTo.y, width:4, dash:[8, 10]});				
 				}
-				else if(node.mac < node.net.neigh[j].mac)//only draw one line, the one from the smallest of the 2 MACs
-				{
-					this.gfx.drawLine({c:"grey", x1:node.x, y1:node.y,
-										x2:node.net.neigh[j].x, y2:node.net.neigh[j].y});
-				}
-				
-				/*this.gfx.drawText({f:"12px Arial", 
-								   t:Math.floor(this.sqrDist(node.x, node.y, node.net.neigh[j].x, node.net.neigh[j].y)), 
-								   x:node.x+(node.net.neigh[j].x - node.x)/2, 
-								   y:node.y + (node.net.neigh[j].y - node.y)/2, 
-								   c:"black"});
-				*/
 			}
 		}
 	}	
@@ -304,6 +331,11 @@ Sim.prototype.drawFrame = function ()
 
 Sim.prototype.mousemove = function (pt) 
 {
+	var x = Math.floor(pt.x/this.ui.snapDistance)*this.ui.snapDistance;
+	var y = Math.floor(pt.y/this.ui.snapDistance)*this.ui.snapDistance;
+	pt.x = x;
+	pt.y = y;
+	
 	this.curCursorPt = pt;
 	var idxNodeFound = this.findNode(pt);
 	this.drawFrame(); //first draw frame
@@ -360,6 +392,7 @@ Sim.prototype.mousemove = function (pt)
 
 Sim.prototype.mousedown = function (pt)
 {
+	pt = this.curCursorPt;
 	if(this.ui.addNode)
 	{	
 		var idxNodeFound = this.findNode(pt);	
@@ -379,6 +412,7 @@ Sim.prototype.mousedown = function (pt)
 
 Sim.prototype.mouseup = function (pt) 
 {
+	pt = this.curCursorPt;
 	if(this.ui.addNode)
 	{
 		if(this.flags.nodeMoving != -1)

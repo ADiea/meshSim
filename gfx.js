@@ -112,11 +112,19 @@ Gfx.prototype.drawLine = function(line)
    {
 	   this.ctx.setLineDash(line.dash);
    }
+   if(line.width)
+   {
+	    this.ctx.lineWidth = line.width;
+   }
    this.ctx.beginPath();
    this.ctx.moveTo(line.x1, line.y1);
    this.ctx.lineTo(line.x2, line.y2);
    this.ctx.stroke();
    this.ctx.setLineDash([]);
+   if(line.width)
+   {
+	    this.ctx.lineWidth = 1;
+   }
 }
 
 Gfx.prototype.winToCanvas = function(x, y) 

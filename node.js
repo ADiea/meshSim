@@ -30,6 +30,7 @@ function Node(x, y, r)
 	//radio submodule
 	this.radioFramePending = false; //is there a radio frame pending for us?
 	this.radioMsg = [];
+	this.txPower = 0;
 		
 	//rtc submodule
 	this.rtcTimestamp = 0;
@@ -68,6 +69,9 @@ Node.prototype.main = function() //this is the main function, called by the rese
 Node.prototype.powerUp = function(mesh)
 {
 	this.mesh = mesh;
+	
+	this.txPower = this.mesh.kMaxTxPower;
+	
 	this.powerUpReason="power";
 	this.isAwake = true;
 	setTimeout(this.onRTCTick.bind(this), this.rtcSpeed);
@@ -199,7 +203,7 @@ Node.prototype.onRTCTick = function()
 Node.prototype.sendMsg = function(msg)
 {
 	this.batDrain(85, .01);
-	return this.net.routeOutgoing(msg);
+	return this.net.routeTraffic(msg);
 }
 
 Node.prototype.onRecvMsg = function(msg)
@@ -209,7 +213,7 @@ Node.prototype.onRecvMsg = function(msg)
 	this.radioFramePending = true;
 	this.radioMsg.push(msg);
 	
-	//don't call ext interrupt directly to avoid recursion for broadcasts
+	//don't call ext interrupt directly to avoid recursion for stats.bcastPkts
 	setTimeout(this.externalIntIRQ.bind(this), 5);
 }
 

@@ -13,7 +13,7 @@
 <script type="text/javascript">
 function simInit()
 {
-	var meshSettings = {errorRate:1};
+	var meshSettings = {errorRate:0};
 	var gfxSettings = {gridSize:20, gridScale:1.0/4};
 	
 	mesh.init(meshSettings);
@@ -33,7 +33,11 @@ function simInit()
 			<input type="radio" id="delNode" name="nodeOp" value="delNode">DelNode</input>
 			<input type="radio" id="pokeNode" name="nodeOp" value="pokeNode">PokeNode</input>
 			
+			<!--
 			<input type="range" id="nodeRadius" min=10 max=100></input><span id="textNodeRadius"></span>
+			-->
+			Snap<input type="text" id="snapDistance"></input>px
+			
 		</td>
 	</tr>
 	<tr colspan="2">
@@ -42,7 +46,7 @@ function simInit()
 			<input type="checkbox" id="showNeigh" checked="true">ShowNeighbours</input>
 			
 			<br/>
-			<input type="checkbox" id="showRoutes" checked="true">ShowRoute</input>
+			<input type="checkbox" id="showRoutes" checked="true">ShowRoute/Neigh</input>
 			From<input type="text" id="showRoutesFrom"></input>
 			To	<input type="text" id="showRoutesTo"></input>
 			<!--<input type="submit"  id="showRoutesSet" value="Show"></input>-->
